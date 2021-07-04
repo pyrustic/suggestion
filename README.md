@@ -160,7 +160,7 @@ $ pip install suggestion
 ```
 
 ### Upgrade
-To upgrade `Threadom`:
+To upgrade `Suggestion`:
 
 ```bash
 $ pip install suggestion --upgrade --upgrade-strategy eager
