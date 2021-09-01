@@ -1,7 +1,7 @@
 # Suggestion
 `Suggestion` is a `Python` library for democratizing auto-complete(suggest) in desktop applications. It's part of the [Pyrustic Open Ecosystem](https://pyrustic.github.io).
 
-[Installation](#installation) | [Website](https://pyrustic.github.io)
+[Installation](#installation) | [Reference](https://github.com/pyrustic/suggestion/tree/master/docs/reference#readme)
 
 ## Overview
 Auto-complete(suggest) is a feature available in smartphone keyboards, browser search bars, and IDEs, so why not in your app too ?
@@ -165,10 +165,3 @@ To upgrade `Suggestion`:
 ```bash
 $ pip install suggestion --upgrade --upgrade-strategy eager
 ```
-
-## Documentation
-I will write it later. I invite you to clone the project and discover how it works ;) It's easy to understand. The engine and the dropdown must respect their respective "interface" `suggestion.Engine` and `suggestion.Dropdown`. Example, the dropdown must have a method `relocate` that is called by `Suggestion` to ask the dropdown to change its coords. 
-
-Bookmark this project so you don't miss any updates !
-
-You can visit my [website](https://pyrustic.github.io) to discover related cool projects !

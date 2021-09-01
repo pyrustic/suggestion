@@ -4,6 +4,9 @@ import tkinter as tk
 from viewable import Viewable
 
 
+SPECIAL_WORDS = {"Return": "\n", "space": " ", "Tab": "\t"}
+
+
 class Suggestion:
     def __init__(self, widget, dataset=None):
         self._widget = widget
@@ -13,6 +16,9 @@ class Suggestion:
         self._dropdown_visible = False
         self._field = None
         self._word = None
+        self._cache = None
+        self._cached_word = None
+        self._special_word = None
         self._word_index = None
         self._info = None
         self._activated = True
@@ -34,7 +40,7 @@ class Suggestion:
 
     @engine.setter
     def engine(self, val):
-        self._clear()
+        self._clear(focus_set=False)
         self._engine = val
 
     @property
@@ -74,6 +80,7 @@ class Suggestion:
         self._dropdown.build()
         self._hide_dropdown(focus_set=False)
         # binding
+        self._widget.bind("<Return>", self._on_key_press, "+")
         self._widget.bind("<KeyPress>", self._on_key_press, "+")
         self._widget.bind("<KeyRelease>", self._on_key_release, "+")
         cache = lambda e, self=self: self._clear()
@@ -83,7 +90,6 @@ class Suggestion:
         self._dropdown.body.bind("<Button-1>", cache, "+")
         self._dropdown.body.bind("<Button-2>", cache, "+")
         self._dropdown.body.bind("<Button-3>", cache, "+")
-        #self._widget.bind("<Escape>", lambda e: self._hide_dropdown)
         # close dropdown on focusOut
         self._widget.bind("<FocusOut>",
                           lambda e,
@@ -95,7 +101,8 @@ class Suggestion:
         keysym = event.keysym
         # Press 'space' or 'Return' will close the dropdown
         if keysym == "space":
-            self._clear()
+            if self._dropdown_visible:
+                self._clear()
         # Press 'Tab' will fill the text field with the selected string
         elif keysym == "Tab":
             if self._dropdown_visible:
@@ -103,7 +110,6 @@ class Suggestion:
                 return "break"
         # Press 'Escape' to hide the dropdown
         elif keysym == "Escape":
-            #self._hide_dropdown()
             self._clear()
         # Press 'Return' will replace the current word in the text field
         elif keysym == "Return":
@@ -119,43 +125,58 @@ class Suggestion:
                 self._dropdown.select_down()
                 return "break"
         elif keysym == "BackSpace":
-            self._clear()
+            if not self._dropdown_visible:
+                self._clear()
 
     def _on_key_release(self, event):
         if not self._activated:
             return
         keysym = event.keysym
-        if keysym in ("space", "Tab", "Escape", "Return",
-                      "Up", "Down", "BackSpace", "Caps_Lock", "??",
-                      "Control_L", "Shift_L", "Control_R", "Shift_R"):
+        if keysym in ("Escape", "Up", "Down", "Caps_Lock", "??",
+                      "Control_L", "Control_R", "Shift_L", "Shift_R"):
+            return
+        if keysym == "BackSpace" and not self._dropdown_visible:
             return
         if keysym in ("Left", "Right") and not self._dropdown_visible:
             return
         self._process_word(event)
 
     def _process_word(self, event):
-        word, self._word_index = self._get_word()
+        if event.keysym in SPECIAL_WORDS:
+            special_word = True
+            word = SPECIAL_WORDS[event.keysym]
+            self._word_index = self._widget.index(tk.INSERT)
+            self._count = 0
+            self._cached_word = self._cache
+        else:
+            special_word = False
+            word, self._word_index = self._get_word()
+            self._count += 1
         if not word:
             self._clear()
             return
-        if self._word is None:
+        if self._special_word or self._field == "entry" or not self._word:
             self._should_relocate = True
         else:
             self._should_relocate = False
+        self._cache_word(word)
         self._word = word
+        self._special_word = special_word
         # Info dataclass
         self._info = Info(event=event, word=self._word,
+                          special_word=special_word,
+                          cached_word=self._cached_word,
                           word_index=self._word_index,
                           widget=self._widget,
                           field=self._field)
-        self._count += 1
         command = (lambda self=self:
                    self._engine.process(self._info,
                                         self._report_results))
         self._widget.after(0, command)
 
-    def _report_results(self, data):
-        self._count -= 1
+    def _report_results(self, data=None):
+        if self._count > 0:
+            self._count -= 1
         if not data:
             self._clear()
             return
@@ -171,6 +192,9 @@ class Suggestion:
         selected = self._dropdown.selected
         if not selected or not self._word:
             return
+        cache = selected.lstrip(" ")
+        cache = cache.rstrip(" ")
+        self._cache_word(cache)
         # let's separate 'selected' into left and right parts
         word_size = len(self._word)
         left_part = selected[0:word_size]
@@ -178,17 +202,22 @@ class Suggestion:
         if left_part == self._word:
             self._widget.insert(tk.INSERT, right_part)
         else:
-            line, col = self._word_index.split(".")
-            cache = ".".join((line, str(int(col) + word_size)))
+            if self._field == "text":
+                line, col = self._word_index.split(".")
+                cache = ".".join((line, str(int(col) + word_size)))
+            elif self._field == "entry":
+                cache = self._word_index + word_size
+            else:
+                raise IllegalWidgetError
             self._widget.delete(self._word_index, cache)
             self._widget.insert(tk.INSERT, selected)
-        # close
         self._clear()
 
     def _clear(self, focus_set=True):
         self._hide_dropdown(focus_set)
         self._word = None
         self._word_index = None
+        self._count = 0
 
     def _get_word(self):
         cursor_index = self._widget.index(tk.INSERT)
@@ -205,7 +234,6 @@ class Suggestion:
 
     def _extract_word(self, cursor_index, line):
         left = []
-        right = []
         # left
         for i in reversed(range(0, cursor_index)):
             char = line[i]
@@ -214,12 +242,6 @@ class Suggestion:
             left.insert(0, char)
         word_index = cursor_index - len(left)
         word = "".join(left)
-        # right
-        #for i in range(index, len(line)):
-        #    char = line[i]
-        #    if char in (" ", "\t", "\n"):
-        #        break
-        #left.extend(right)
         return word, word_index
 
     def _hide_dropdown(self, focus_set=True):
@@ -232,9 +254,11 @@ class Suggestion:
     def _unhide_dropdown(self):
         if self._dropdown:
             self._dropdown.body.deiconify()
-            #self._dropdown.body.focus_set()
-            #self._dropdown.body.grab_set()
         self._dropdown_visible = True
+
+    def _cache_word(self, word):
+        if word and word not in SPECIAL_WORDS.values():
+            self._cache = word
 
 
 class Dropdown(Viewable):
@@ -285,11 +309,6 @@ class DefaultDropdown(Dropdown):
         self._selected_index = 0
         self._listbox.delete(0, tk.END)
         self._listbox.insert(0, *data)
-        #listbox_height = 5
-        data_size = len(data)
-        #if data_size < 5:
-        #    listbox_height = data_size
-        #self._listbox.config(height=listbox_height)
         self._select_line(0)
 
     def relocate(self, info):
@@ -305,10 +324,11 @@ class DefaultDropdown(Dropdown):
         x = x + widget.winfo_rootx()
         y = y + widget.winfo_rooty()
         dropdown_height = self._body.winfo_height()
+        margin_y = 3
         if dropdown_height + y + height > widget.winfo_screenheight():
-            y = y - dropdown_height
+            y = y - dropdown_height - margin_y
         else:
-            y = y + height
+            y = y + height + margin_y
         self._body.withdraw()
         self._body.update_idletasks()
         self._body.geometry("+{}+{}".format(x, y))
@@ -333,7 +353,8 @@ class DefaultDropdown(Dropdown):
     def _build(self):
         self._body = tk.Toplevel()
         self._body.overrideredirect(1)
-        self._listbox = tk.Listbox(self._body, height=5)
+        self._listbox = tk.Listbox(self._body, height=5,
+                                   borderwidth=0)
         self._listbox.pack()
 
     def _on_map(self):
@@ -362,8 +383,11 @@ class DefaultEngine(Engine):
         self._setup()
 
     def process(self, info, callback):
-        word = info.word
-        self._search(word, callback)
+        # return if word is a special word
+        # special words: " ", "\t", "\n"
+        if info.special_word:
+            return
+        self._search(info.word, callback)
 
     def _setup(self):
         if isinstance(self._dataset, str):
