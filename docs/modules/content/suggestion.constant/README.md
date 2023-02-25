@@ -2,11 +2,11 @@ Back to [All Modules](https://github.com/pyrustic/suggestion/blob/master/docs/mo
 
 # Module Overview
 
-**suggestion**
+**suggestion.constant**
  
 No description
 
-> **Classes:** &nbsp; [Suggestion](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/Suggestion.md#class-suggestion)
+> **Classes:** &nbsp; None
 >
 > **Functions:** &nbsp; None
 >

@@ -1,27 +1,27 @@
-import os
-import os.path
 import tkinter as tk
-from viewable import Viewable
-
-
-SPECIAL_WORDS = {"Return": "\n", "space": " ", "Tab": "\t"}
+from suggestion import error
+from suggestion import dto
+from suggestion.constant import WHITESPACE
+from suggestion.engine import DefaultEngine
+from suggestion.dropdown import DefaultDropdown
 
 
 class Suggestion:
-    def __init__(self, widget, dataset=None):
+    def __init__(self, widget, dataset=None,
+                 engine=DefaultEngine, dropdown=DefaultDropdown):
         self._widget = widget
         self._dataset = dataset
-        self._engine = None
-        self._dropdown = None
+        self._engine = engine
+        self._dropdown = dropdown
         self._dropdown_visible = False
-        self._field = None
+        self._multiline_field = None
         self._word = None
         self._cache = None
-        self._cached_word = None
-        self._special_word = None
+        self._previous_word = None
+        self._is_whitespace = None
         self._word_index = None
-        self._info = None
-        self._activated = True
+        self._word_context = None
+        self._active = False
         self._count = 0
         self._should_relocate = False
         self._setup()
@@ -31,75 +31,105 @@ class Suggestion:
         return self._widget
 
     @property
-    def dataset(self):
-        return self._dataset
-
-    @property
     def engine(self):
         return self._engine
-
-    @engine.setter
-    def engine(self, val):
-        self._clear(focus_set=False)
-        self._engine = val
 
     @property
     def dropdown(self):
         return self._dropdown
 
-    @dropdown.setter
-    def dropdown(self, val):
-        self._clear()
-        self._dropdown = val
+    @property
+    def multiline_field(self):
+        return self._multiline_field
 
     @property
-    def activated(self):
-        return self._activated
+    def active(self):
+        return self._active
+
+    def suggest(self, data):
+        if not self._active:
+            return False
+        self._clear()
+        self._word = ""
+        self._word_index = self._widget.index(tk.INSERT)
+        self._report_results(data)
+        return True
 
     def activate(self):
-        self._activated = True
+        self._active = True
 
     def deactivate(self):
-        self._activated = False
+        self._active = False
+
+    def set_dataset(self, dataset):
+        if not self._engine:
+            return
+        self._clear(focus_set=False)
+        self._engine.set_dataset(dataset)
+
+    def extend_dataset(self, val):
+        if not self._engine:
+            return
+        self._clear(focus_set=False)
+        self._engine.extend_dataset(val)
+
+    def read_dataset(self):
+        if not self._engine:
+            yield from ()
+            return
+        for x in self._engine.read_dataset():
+            yield x
+
+    def set_engine(self, engine, dataset=None):
+        self._clear(focus_set=False)
+        if isinstance(engine, type):
+            self._engine = engine()
+        else:
+            self._engine = engine
+        if dataset:
+            self._engine.set_dataset(dataset)
 
     def _setup(self):
         # field
         if isinstance(self._widget, tk.Entry):
-            self._field = "entry"
+            self._multiline_field = False
         elif isinstance(self._widget, tk.Text):
-            self._field = "text"
+            self._multiline_field = True
         else:
-            raise IllegalWidgetError("Suggestion supports these Tkinter widgets: tk.Entry and tk.Text")
-        # default dataset
-        if not self._dataset:
-            self._dataset = tuple()
-        # default engine
-        self._engine = DefaultEngine(self._dataset)
-        # default dropdown
-        self._dropdown = DefaultDropdown()
-        self._dropdown.build()
+            msg = "Suggestion supports these Tkinter widgets: tk.Entry and tk.Text"
+            raise error.IllegalWidgetError(msg)
+        #
+        if isinstance(self._engine, type):
+            self._engine = self._engine()
+        if isinstance(self._dropdown, type):
+            self._dropdown = self._dropdown()
+        # engine
+        if self._dataset:
+            self._engine.set_dataset(self._dataset)
+            self._dataset = None
+        # build dropdown
+        self._dropdown.build(self._widget)
         self._hide_dropdown(focus_set=False)
         # binding
-        self._widget.bind("<Return>", self._on_key_press, "+")
-        self._widget.bind("<KeyPress>", self._on_key_press, "+")
-        self._widget.bind("<KeyRelease>", self._on_key_release, "+")
-        cache = lambda e, self=self: self._clear()
-        self._widget.bind("<Button-1>", cache, "+")
-        self._widget.bind("<Button-2>", cache, "+")
-        self._widget.bind("<Button-3>", cache, "+")
-        self._dropdown.body.bind("<Button-1>", cache, "+")
-        self._dropdown.body.bind("<Button-2>", cache, "+")
-        self._dropdown.body.bind("<Button-3>", cache, "+")
+        self._widget.bind("<Return>", self._on_key_press, True)
+        self._widget.bind("<KeyPress>", self._on_key_press, True)
+        self._widget.bind("<KeyRelease>", self._on_key_release, True)
+        command = lambda e, self=self: self._clear()
+        self._widget.bind("<Button-1>", command, True)
+        self._widget.bind("<Button-2>", command, True)
+        self._widget.bind("<Button-3>", command, True)
+        self._dropdown.body.bind("<Button-1>", command, True)
+        self._dropdown.body.bind("<Button-2>", command, True)
+        self._dropdown.body.bind("<Button-3>", command, True)
         # close dropdown on focusOut
-        self._widget.bind("<FocusOut>",
-                          lambda e,
-                                 self=self: self._clear(focus_set=False))
+        command = lambda e, self=self: self._clear(focus_set=False)
+        self._widget.bind("<FocusOut>", command)
 
     def _on_key_press(self, event):
-        if not self._activated:
+        if not self._active:
             return
         keysym = event.keysym
-        # Press 'space' or 'Return' will close the dropdown
+        # Press 'space' will close the dropdown
         if keysym == "space":
             if self._dropdown_visible:
                 self._clear()
@@ -129,7 +159,7 @@ class Suggestion:
                 self._clear()
 
     def _on_key_release(self, event):
-        if not self._activated:
+        if not self._active:
             return
         keysym = event.keysym
         if keysym in ("Escape", "Up", "Down", "Caps_Lock", "??",
@@ -142,36 +172,36 @@ class Suggestion:
         self._process_word(event)
 
     def _process_word(self, event):
-        if event.keysym in SPECIAL_WORDS:
-            special_word = True
-            word = SPECIAL_WORDS[event.keysym]
+        word = whitespace = None
+        if event.keysym in WHITESPACE:
+            is_whitespace = True
+            whitespace = WHITESPACE[event.keysym]
             self._word_index = self._widget.index(tk.INSERT)
             self._count = 0
-            self._cached_word = self._cache
+            self._previous_word = self._cache
         else:
-            special_word = False
+            is_whitespace = False
             word, self._word_index = self._get_word()
             self._count += 1
         if not word:
             self._clear()
             return
-        if self._special_word or self._field == "entry" or not self._word:
+        if self._is_whitespace or self._multiline_field == "entry" or not self._word:
             self._should_relocate = True
         else:
             self._should_relocate = False
         self._cache_word(word)
         self._word = word
-        self._special_word = special_word
+        self._is_whitespace = is_whitespace
+        if whitespace:
+            return
         # Info dataclass
-        self._info = Info(event=event, word=self._word,
-                          special_word=special_word,
-                          cached_word=self._cached_word,
-                          word_index=self._word_index,
-                          widget=self._widget,
-                          field=self._field)
-        command = (lambda self=self:
-                   self._engine.process(self._info,
-                                        self._report_results))
+        self._word_context = dto.WordContext(event=event,
+                                             word_index=self._word_index,
+                                             word=self._word,
+                                             previous_word=self._previous_word)
+        command = lambda: self._engine.search(self._word_context,
+                                              self._report_results)
         self._widget.after(0, command)
 
     def _report_results(self, data=None):
@@ -183,14 +213,17 @@ class Suggestion:
         if self._count == 0:
             self._dropdown.populate(data)
             if self._should_relocate:
-                self._dropdown.relocate(self._info)
+                self._relocate_dropdown()
+                #self._dropdown.relocate(self._word_context)
             self._unhide_dropdown()
 
     def _edit_field(self):
         if not self._dropdown_visible:
             return
         selected = self._dropdown.selected
-        if not selected or not self._word:
+        #if not selected or not self._word:
+        #    return
+        if not selected:
             return
         cache = selected.lstrip(" ")
         cache = cache.rstrip(" ")
@@ -202,13 +235,11 @@ class Suggestion:
         if left_part == self._word:
             self._widget.insert(tk.INSERT, right_part)
         else:
-            if self._field == "text":
+            if self._multiline_field:
                 line, col = self._word_index.split(".")
                 cache = ".".join((line, str(int(col) + word_size)))
-            elif self._field == "entry":
-                cache = self._word_index + word_size
             else:
-                raise IllegalWidgetError
+                cache = self._word_index + word_size
             self._widget.delete(self._word_index, cache)
             self._widget.insert(tk.INSERT, selected)
         self._clear()
@@ -217,20 +248,19 @@ class Suggestion:
         self._hide_dropdown(focus_set)
         self._word = None
         self._word_index = None
+        self._should_relocate = True
         self._count = 0
 
     def _get_word(self):
         cursor_index = self._widget.index(tk.INSERT)
-        if self._field == "entry":
-            data = self._widget.get()
-            return self._extract_word(cursor_index, data)
-        elif self._field == "text":
+        if self._multiline_field:
             line, i = cursor_index.split(".")
             data = self._widget.get(".".join((line, "0")), tk.END)
             word, word_index = self._extract_word(int(i), data)
             return word, ".".join((line, str(word_index)))
         else:
-            raise Error("Unknown field type")
+            data = self._widget.get()
+            return self._extract_word(cursor_index, data)
 
     def _extract_word(self, cursor_index, line):
         left = []
@@ -257,181 +287,25 @@ class Suggestion:
         self._dropdown_visible = True
 
     def _cache_word(self, word):
-        if word and word not in SPECIAL_WORDS.values():
+        if word and word not in WHITESPACE.values():
             self._cache = word
 
-
-class Dropdown(Viewable):
-    """ This is the 'interface' that your Dropdown must respects """
-
-    @property
-    def selected(self):
-        """ Returns the selected word (string)"""
-        return None
-
-    def populate(self, data):
-        """ Called by Suggestion after the engine sent results """
-        pass
-
-    def relocate(self, info):
-        """ Called by Suggestion to indicate the Dropdown to change its coords """
-        pass
-
-    def select_up(self):
-        """ User pressed the up arrow key """
-        pass
-
-    def select_down(self):
-        """ User pressed the down arrow key """
-        pass
-
-
-class DefaultDropdown(Dropdown):
-    def __init__(self):
-        super().__init__()
-        self._data = None
-        self._selected_index = None
-        self._info = None
-        self._listbox = None
-
-    @property
-    def selected(self):
-        if self._selected_index is None:
-            return ""
-        return self._data[self._selected_index]
-
-    def populate(self, data):
-        if not self._body or not data:
-            self._data = None
-            self._selected_index = None
-            return
-        self._data = data
-        self._selected_index = 0
-        self._listbox.delete(0, tk.END)
-        self._listbox.insert(0, *data)
-        self._select_line(0)
-
-    def relocate(self, info):
-        field = info.field
-        widget = info.event.widget
-        word_index = info.word_index
-        if field == "text":
-            x, y, width, height = widget.bbox(word_index)
-        elif field == "entry":
-            x, y, width, height = widget._getints(widget.tk.call((widget, "bbox", word_index)))
+    def _relocate_dropdown(self):
+        word_index = self._word_index if self._word_index else self._widget.index(tk.INSERT)
+        dropdown_body = self._dropdown.body
+        if self._multiline_field:
+            x, y, width, height = self._widget.bbox(word_index)
         else:
-            raise IllegalWidgetError
-        x = x + widget.winfo_rootx()
-        y = y + widget.winfo_rooty()
-        dropdown_height = self._body.winfo_height()
+            x, y, width, height = self._widget._getints(self._widget.tk.call((self._widget, "bbox", word_index)))
+        x = x + self._widget.winfo_rootx()
+        y = y + self._widget.winfo_rooty()
+        dropdown_height = dropdown_body.winfo_height()
         margin_y = 3
-        if dropdown_height + y + height > widget.winfo_screenheight():
+        if dropdown_height + y + height > self._widget.winfo_screenheight():
             y = y - dropdown_height - margin_y
         else:
             y = y + height + margin_y
-        self._body.withdraw()
-        self._body.update_idletasks()
-        self._body.geometry("+{}+{}".format(x, y))
-        self._body.deiconify()
-
-    def select_up(self):
-        if not self._data or self._selected_index is None:
-            return
-        self._selected_index -= 1
-        if self._selected_index == -1:
-            self._selected_index = len(self._data) - 1
-        self._select_line(self._selected_index)
-
-    def select_down(self):
-        if not self._data or self._selected_index is None:
-            return
-        self._selected_index += 1
-        if self._selected_index == len(self._data):
-            self._selected_index = 0
-        self._select_line(self._selected_index)
-
-    def _build(self):
-        self._body = tk.Toplevel()
-        self._body.overrideredirect(1)
-        self._listbox = tk.Listbox(self._body, height=5,
-                                   borderwidth=0)
-        self._listbox.pack()
-
-    def _on_map(self):
-        pass
-
-    def _on_destroy(self):
-        pass
-
-    def _select_line(self, index):
-        self._listbox.selection_clear(0, tk.END)
-        self._listbox.selection_set(index)
-        self._listbox.see(index)
-        self._listbox.activate(index)
-        self._listbox.selection_anchor(index)
-
-
-class Engine:
-    def process(self, info, callback):
-        pass
-
-
-class DefaultEngine(Engine):
-
-    def __init__(self, dataset):
-        self._dataset = dataset
-        self._setup()
-
-    def process(self, info, callback):
-        # return if word is a special word
-        # special words: " ", "\t", "\n"
-        if info.special_word:
-            return
-        self._search(info.word, callback)
-
-    def _setup(self):
-        if isinstance(self._dataset, str):
-            # load words if dataset is a filename
-            if not os.path.exists(self._dataset):
-                raise Error("The dataset filename doesn't exist !")
-            # now _dataset is a sequence of words
-            with open(self._dataset, "r") as file:
-                self._dataset = file.read().split()
-        self._prepare_dataset()
-
-    def _prepare_dataset(self):
-        cache = {}
-        for word in self._dataset:
-            prefix = word[0:3]
-            if prefix not in cache:
-                cache[prefix] = []
-            cache[prefix].append(word)
-        self._dataset = cache
-
-    def _search(self, word, callback):
-        result = []
-        for key, val in self._dataset.items():
-            if key.startswith(word) or word.startswith(key):
-                for item in val:
-                    if item.startswith(word):
-                        result.append(item)
-        callback(result)
-
-
-class Info:
-    def __init__(self, **kwargs):
-        for key, val in kwargs.items():
-            setattr(self, key, val)
-
-
-class Error(Exception):
-    def __init__(self, *args, **kwargs):
-        self.message = args[0] if args else ""
-        super().__init__(self.message)
-
-    def __str__(self):
-        return self.message
-
-
-class IllegalWidgetError(Error):
-    pass
+        dropdown_body.withdraw()
+        dropdown_body.update_idletasks()
+        dropdown_body.geometry("+{}+{}".format(x, y))
+        dropdown_body.deiconify()

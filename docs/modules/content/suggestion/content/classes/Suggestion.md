@@ -6,11 +6,11 @@ Back to [All Modules](https://github.com/pyrustic/suggestion/blob/master/docs/mo
  
 No description
 
-> **Classes:** &nbsp; [DefaultDropdown](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/DefaultDropdown.md#class-defaultdropdown) &nbsp;&nbsp; [DefaultEngine](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/DefaultEngine.md#class-defaultengine) &nbsp;&nbsp; [Dropdown](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/Dropdown.md#class-dropdown) &nbsp;&nbsp; [Engine](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/Engine.md#class-engine) &nbsp;&nbsp; [Error](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/Error.md#class-error) &nbsp;&nbsp; [IllegalWidgetError](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/IllegalWidgetError.md#class-illegalwidgeterror) &nbsp;&nbsp; [Info](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/Info.md#class-info) &nbsp;&nbsp; [Suggestion](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/Suggestion.md#class-suggestion)
+> **Classes:** &nbsp; [Suggestion](https://github.com/pyrustic/suggestion/blob/master/docs/modules/content/suggestion/content/classes/Suggestion.md#class-suggestion)
 >
 > **Functions:** &nbsp; None
 >
-> **Constants:** &nbsp; SPECIAL_WORDS
+> **Constants:** &nbsp; WHITESPACE
 
 # Class Suggestion
 No description.
@@ -19,42 +19,152 @@ No description.
 object
 
 ## Class Attributes
-
+No class attributes.
 
 ## Class Properties
 |Property|Type|Description|Inherited from|
 |---|---|---|---|
-|activated|getter|None||
-|dataset|getter|None||
+|active|getter|None||
 |dropdown|getter|None||
-|dropdown|setter|None||
 |engine|getter|None||
-|engine|setter|None||
+|multiline_field|getter|None||
 |widget|getter|None||
 
 
 
 # All Methods
-[\_\_init\_\_](#__init__) &nbsp;&nbsp; [\_cache\_word](#_cache_word) &nbsp;&nbsp; [\_clear](#_clear) &nbsp;&nbsp; [\_edit\_field](#_edit_field) &nbsp;&nbsp; [\_extract\_word](#_extract_word) &nbsp;&nbsp; [\_get\_word](#_get_word) &nbsp;&nbsp; [\_hide\_dropdown](#_hide_dropdown) &nbsp;&nbsp; [\_on\_key\_press](#_on_key_press) &nbsp;&nbsp; [\_on\_key\_release](#_on_key_release) &nbsp;&nbsp; [\_process\_word](#_process_word) &nbsp;&nbsp; [\_report\_results](#_report_results) &nbsp;&nbsp; [\_setup](#_setup) &nbsp;&nbsp; [\_unhide\_dropdown](#_unhide_dropdown) &nbsp;&nbsp; [activate](#activate) &nbsp;&nbsp; [deactivate](#deactivate)
+[\_\_init\_\_](#__init__) &nbsp;&nbsp; [activate](#activate) &nbsp;&nbsp; [deactivate](#deactivate) &nbsp;&nbsp; [extend\_dataset](#extend_dataset) &nbsp;&nbsp; [read\_dataset](#read_dataset) &nbsp;&nbsp; [set\_dataset](#set_dataset) &nbsp;&nbsp; [set\_engine](#set_engine) &nbsp;&nbsp; [suggest](#suggest) &nbsp;&nbsp; [\_cache\_word](#_cache_word) &nbsp;&nbsp; [\_clear](#_clear) &nbsp;&nbsp; [\_edit\_field](#_edit_field) &nbsp;&nbsp; [\_extract\_word](#_extract_word) &nbsp;&nbsp; [\_get\_word](#_get_word) &nbsp;&nbsp; [\_hide\_dropdown](#_hide_dropdown) &nbsp;&nbsp; [\_on\_key\_press](#_on_key_press) &nbsp;&nbsp; [\_on\_key\_release](#_on_key_release) &nbsp;&nbsp; [\_process\_word](#_process_word) &nbsp;&nbsp; [\_relocate\_dropdown](#_relocate_dropdown) &nbsp;&nbsp; [\_report\_results](#_report_results) &nbsp;&nbsp; [\_setup](#_setup) &nbsp;&nbsp; [\_unhide\_dropdown](#_unhide_dropdown)
 
 ## \_\_init\_\_
 Initialize self.  See help(type(self)) for accurate signature.
 
 
 
-**Signature:** (self, widget, dataset=None)
+**Signature:** (self, widget, dataset=None, engine=<class 'suggestion.engine.DefaultEngine'>, dropdown=<class 'suggestion.dropdown.DefaultDropdown'>)
 
 
 
 
 
-**Return Value:** None.
+**Return Value:** None
+
+[Back to Top](#module-overview)
+
+
+## activate
+No description
+
+
+
+**Signature:** (self)
+
+
+
+
+
+**Return Value:** None
+
+[Back to Top](#module-overview)
+
+
+## deactivate
+No description
+
+
+
+**Signature:** (self)
+
+
+
+
+
+**Return Value:** None
+
+[Back to Top](#module-overview)
+
+
+## extend\_dataset
+No description
+
+
+
+**Signature:** (self, val)
+
+
+
+
+
+**Return Value:** None
+
+[Back to Top](#module-overview)
+
+
+## read\_dataset
+No description
+
+
+
+**Signature:** (self)
+
+
+
+
+
+**Return Value:** None
+
+[Back to Top](#module-overview)
+
+
+## set\_dataset
+No description
+
+
+
+**Signature:** (self, dataset)
+
+
+
+
+
+**Return Value:** None
+
+[Back to Top](#module-overview)
+
+
+## set\_engine
+No description
+
+
+
+**Signature:** (self, engine, dataset=None)
+
+
+
+
+
+**Return Value:** None
+
+[Back to Top](#module-overview)
+
+
+## suggest
+No description
+
+
+
+**Signature:** (self, data)
+
+
+
+
+
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_cache\_word
-None
+No description
 
 
 
@@ -64,13 +174,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_clear
-None
+No description
 
 
 
@@ -80,13 +190,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_edit\_field
-None
+No description
 
 
 
@@ -96,13 +206,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_extract\_word
-None
+No description
 
 
 
@@ -112,13 +222,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_get\_word
-None
+No description
 
 
 
@@ -128,13 +238,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_hide\_dropdown
-None
+No description
 
 
 
@@ -144,13 +254,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_on\_key\_press
-None
+No description
 
 
 
@@ -160,13 +270,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_on\_key\_release
-None
+No description
 
 
 
@@ -176,13 +286,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_process\_word
-None
+No description
 
 
 
@@ -192,13 +302,29 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
+
+[Back to Top](#module-overview)
+
+
+## \_relocate\_dropdown
+No description
+
+
+
+**Signature:** (self)
+
+
+
+
+
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_report\_results
-None
+No description
 
 
 
@@ -208,13 +334,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_setup
-None
+No description
 
 
 
@@ -224,13 +350,13 @@ None
 
 
 
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
 
 ## \_unhide\_dropdown
-None
+No description
 
 
 
@@ -240,39 +366,7 @@ None
 
 
 
-**Return Value:** None.
-
-[Back to Top](#module-overview)
-
-
-## activate
-None
-
-
-
-**Signature:** (self)
-
-
-
-
-
-**Return Value:** None.
-
-[Back to Top](#module-overview)
-
-
-## deactivate
-None
-
-
-
-**Signature:** (self)
-
-
-
-
-
-**Return Value:** None.
+**Return Value:** None
 
 [Back to Top](#module-overview)
 
